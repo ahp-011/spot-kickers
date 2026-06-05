@@ -83,8 +83,27 @@ body{background:
   display:flex;flex-direction:column;color:#1f6fe0;
   -webkit-text-stroke:3px var(--ink);paint-order:stroke fill;
   text-shadow:0 4px 0 rgba(5,16,46,.85);
+  position:relative;overflow:hidden;padding:6px 14px;will-change:transform;
+  animation:titleBob 2.8s ease-in-out infinite;
 }
 .title span{color:#e23b3b}
+/* white "laser" shine that blinks across the logo */
+.title::after{
+  content:'';position:absolute;top:0;left:0;width:34%;height:100%;pointer-events:none;
+  background:linear-gradient(100deg, transparent 0%, rgba(255,255,255,.9) 50%, transparent 100%);
+  mix-blend-mode:screen;transform:translateX(-260%) skewX(-18deg);
+  animation:titleShine 3.6s ease-in-out infinite;
+}
+@keyframes titleBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes titleShine{
+  0%{transform:translateX(-260%) skewX(-18deg)}
+  16%{transform:translateX(360%) skewX(-18deg)}
+  100%{transform:translateX(360%) skewX(-18deg)}
+}
+@media (prefers-reduced-motion: reduce){
+  .title{animation:none}
+  .title::after{display:none}
+}
 
 .tagline{color:#2a3b63;font-size:.92rem;line-height:1.4;font-weight:700;letter-spacing:.4px}
 .hint{color:#5a6b8c;font-size:.78rem;letter-spacing:.5px}
