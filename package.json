@@ -1,0 +1,10 @@
+{
+  "name": "penalty-shootout",
+  "version": "1.0.0",
+  "description": "A polished single-page penalty shootout game — plain HTML/CSS/JS, zero dependencies.",
+  "scripts": {
+    "dev": "npx --yes serve -l 3456 .",
+    "start": "npx --yes serve -l 3456 ."
+  },
+  "private": true
+}

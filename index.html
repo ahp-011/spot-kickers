@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#060d22" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Spot Kickers — Penalty Shootout</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Russo+One&family=Inter:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ───────── MENU ───────── -->
+    <div id="screen-menu" class="screen active">
+      <div class="menu-card">
+        <h1 class="title">SPOT<span>KICKERS</span></h1>
+
+        <div class="team-current">
+          <span class="tc-flag" id="tc-flag">🇦🇷</span>
+          <span class="tc-name" id="tc-name">Argentina</span>
+        </div>
+
+        <div class="picker">
+          <span class="picker-label">Choose your team</span>
+          <div class="team-grid" id="team-grid"></div>
+        </div>
+
+        <button id="btn-play" class="btn">START MATCH ⚽</button>
+      </div>
+      <div class="credit">Made for love of FIFA by
+        <a href="https://www.linkedin.com/in/ahp01productdesigner/" target="_blank" rel="noopener">Aman Hassan</a>
+      </div>
+    </div>
+
+    <!-- ───────── GAME ───────── -->
+    <div id="screen-game" class="screen">
+      <canvas id="canvas"></canvas>
+
+      <div id="hint">Tap where you want to shoot!</div>
+
+      <div id="scoreboard">
+        <div class="sb-team">
+          <span class="sb-flag" id="you-flag">🇫🇷</span>
+          <div class="sb-info">
+            <span class="sb-name" id="you-name">France</span>
+            <div class="sb-dots" id="you-dots"></div>
+          </div>
+        </div>
+        <div class="sb-team right">
+          <div class="sb-info">
+            <span class="sb-name" id="opp-name">Spain</span>
+            <div class="sb-dots" id="opp-dots"></div>
+          </div>
+          <span class="sb-flag" id="opp-flag">🇪🇸</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────── RESULT POPUP (in-game) ───────── -->
+    <div id="flash" class="hidden"><span id="flash-text"></span></div>
+
+    <!-- ───────── END ───────── -->
+    <div id="screen-end" class="screen">
+      <div class="menu-card">
+        <div class="badge" id="end-emoji">🏆</div>
+        <h2 class="title" id="end-title">GREAT!</h2>
+        <div class="end-score"><span id="end-num">0 – 0</span></div>
+        <p class="tagline" id="end-msg"></p>
+        <button id="btn-again" class="btn">PLAY AGAIN</button>
+        <button id="btn-menu" class="btn ghost">MENU</button>
+      </div>
+    </div>
+
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
