@@ -83,21 +83,21 @@ body{background:
   display:flex;flex-direction:column;color:#1f6fe0;
   -webkit-text-stroke:3px var(--ink);paint-order:stroke fill;
   text-shadow:0 4px 0 rgba(5,16,46,.85);
-  position:relative;overflow:hidden;padding:6px 14px;will-change:transform;
-  animation:titleBob 2.8s ease-in-out infinite;
+  position:relative;overflow:hidden;padding:8px 16px;will-change:transform;
+  transform-origin:center;animation:titlePulse 3.6s ease-in-out infinite;
 }
 .title span{color:#e23b3b}
 /* white "laser" shine that blinks across the logo */
 .title::after{
   content:'';position:absolute;top:0;left:0;width:34%;height:100%;pointer-events:none;
-  background:linear-gradient(100deg, transparent 0%, rgba(255,255,255,.9) 50%, transparent 100%);
+  background:linear-gradient(100deg, transparent 0%, rgba(255,255,255,.85) 50%, transparent 100%);
   mix-blend-mode:screen;transform:translateX(-260%) skewX(-18deg);
-  animation:titleShine 3.6s ease-in-out infinite;
+  animation:titleShine 5s ease-in-out infinite;
 }
-@keyframes titleBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes titlePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 @keyframes titleShine{
   0%{transform:translateX(-260%) skewX(-18deg)}
-  16%{transform:translateX(360%) skewX(-18deg)}
+  24%{transform:translateX(360%) skewX(-18deg)}
   100%{transform:translateX(360%) skewX(-18deg)}
 }
 @media (prefers-reduced-motion: reduce){
@@ -159,6 +159,25 @@ body{background:
 /* ── game screen (full-bleed cartoon pitch + bottom scoreboard) ── */
 #screen-game{display:block;padding:0}
 #canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:pointer}
+
+/* kickoff flag flourish */
+#kickoff{
+  position:absolute;inset:0;z-index:16;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  background:radial-gradient(circle at 50% 45%, rgba(0,0,0,.28), rgba(0,0,0,0) 60%);
+  animation:kickoffShow 1.5s ease forwards;
+}
+#kickoff.hidden{display:none}
+#kickoff-flag{font-size:clamp(4.5rem,24vw,9rem);line-height:1;display:inline-block;
+  transform-origin:50% 50%;filter:drop-shadow(0 6px 10px rgba(0,0,0,.4));
+  animation:flagPop .42s cubic-bezier(.18,.89,.32,1.5), flagWave .8s ease-in-out .42s 2}
+#kickoff-name{font-family:'Luckiest Guy',cursive;text-transform:uppercase;letter-spacing:1px;
+  font-size:clamp(1.6rem,8vw,2.8rem);color:#fff;
+  -webkit-text-stroke:3px var(--ink);paint-order:stroke fill;text-shadow:0 4px 0 rgba(5,16,46,.75);
+  animation:flagPop .5s cubic-bezier(.18,.89,.32,1.5)}
+@keyframes kickoffShow{0%{opacity:0}12%{opacity:1}78%{opacity:1}100%{opacity:0}}
+@keyframes flagPop{0%{transform:scale(.2);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes flagWave{0%,100%{transform:rotate(0) skewX(0)}25%{transform:rotate(-7deg) skewX(7deg)}75%{transform:rotate(7deg) skewX(-7deg)}}
 
 /* small fading hint */
 #hint{

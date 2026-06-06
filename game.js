@@ -183,12 +183,28 @@ function start(){
   $('you-flag').textContent=S.team.flag; $('you-name').textContent=S.team.name;
   $('opp-flag').textContent=S.opp.flag;  $('opp-name').textContent=S.opp.name;
   show('game'); resize(); updateHUD();
-  sfxWhistle();
-  // brief hint, then fade
-  hintEl.classList.remove('hide'); hintEl.textContent='Tap where you want to shoot!';
-  setTimeout(()=>hintEl.classList.add('hide'), 2600);
-  newShot();
+  // keeper idles during the intro; taps ignored until kickoff finishes
+  S.state='intro';
+  S.kx=0; S.kBaseX=0; S.bx=canvas.width/2; S.by=spotY(); S.ballR=Math.max(12,canvas.width*0.022);
   stopLoop(); S.last=performance.now(); S.raf=requestAnimationFrame(loop);
+
+  // chosen-country flag flourish, then start play
+  playKickoffFlag(S.team, ()=>{
+    sfxWhistle();
+    hintEl.classList.remove('hide'); hintEl.textContent='Tap where you want to shoot!';
+    setTimeout(()=>hintEl.classList.add('hide'), 2600);
+    newShot();
+  });
+}
+
+function playKickoffFlag(team, done){
+  const el=$('kickoff'), f=$('kickoff-flag'), n=$('kickoff-name');
+  f.textContent=team.flag; n.textContent=team.name;
+  el.classList.remove('hidden');
+  // re-trigger the CSS animations
+  el.style.animation='none'; void el.offsetWidth; el.style.animation='';
+  clearTimeout(S._koTimer);
+  S._koTimer=setTimeout(()=>{ el.classList.add('hidden'); done&&done(); }, 1500);
 }
 
 function newShot(){
