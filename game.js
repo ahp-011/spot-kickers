@@ -15,7 +15,6 @@ const CFG = {
   keeperTopBonus:    0.82,  // reach multiplier for high shots (<1 = top corners are harder to save)
   keeperWrongGuess:  0.0,   // chance keeper fumbles a reachable ball (0 = glove always matches outcome)
   goalDiveShort:     0.35,  // on a GOAL, keeper dives only this fraction of its reach (clear visible gap)
-  oppSkill:          0.62,  // chance the CPU opponent scores each of their penalties
   // Goalkeeper kit (cartoon — black & yellow)
   gkShirt:  '#1f2330',
   gkTrim:   '#ffd23f',
@@ -92,14 +91,12 @@ function sfxWhistle(){ try{
 // ─────────── STATE ───────────
 const S = {
   team: TEAMS[0],
-  opp: TEAMS[4],
   accent: TEAMS[0].accent,
   phase:'menu',
   kickAnim:0,      // 0..1 kicker leg swing on shoot
   kPatrol:0, kBaseX:0, kDiveX:0,  // keeper patrol phase, patrol pos, dive target (px offset)
   shot:0,          // current shot index (0-based)
-  goals:0, oppGoals:0,
-  oppResults:[],   // opponent 'goal' | 'miss'
+  goals:0,
   results:[],      // 'goal' | 'miss'
   state:'aim',     // aim | flying | done
   // ball
@@ -176,12 +173,9 @@ if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{ if(S.
 // ─────────── GAME FLOW ───────────
 function start(){
   audio(); // unlock audio on user gesture
-  S.phase='game'; S.shot=0; S.goals=0; S.oppGoals=0; S.results=[]; S.oppResults=[]; S.particles=[];
-  // pick a random opponent nation (different from yours)
-  do { S.opp = TEAMS[Math.floor(Math.random()*TEAMS.length)]; } while(S.opp.abbr===S.team.abbr);
+  S.phase='game'; S.shot=0; S.goals=0; S.results=[]; S.particles=[];
   document.documentElement.style.setProperty('--accent', S.team.accent);
   $('you-flag').textContent=S.team.flag; $('you-name').textContent=S.team.name;
-  $('opp-flag').textContent=S.opp.flag;  $('opp-name').textContent=S.opp.name;
   show('game'); resize(); updateHUD();
   // keeper idles during the intro; taps ignored until kickoff finishes
   S.state='intro';
@@ -259,7 +253,7 @@ function resolve(){
   const scored = !S._saved;
   if(scored){
     S.goals++; S.results.push('goal');
-    S.ripple=1.2; S.shake=CFG.shakeMag; spawnParticles(S.tx,S.ty);
+    S.ripple=1.2; S.shake=CFG.shakeMag; spawnParticles(S.tx,S.ty); spawnSideConfetti();
     showFlash('GOAL!', '#2ecc55'); sfxCrowd(true);
     vibrate([60,40,120]);            // celebratory buzz on a goal
   } else {
@@ -269,11 +263,6 @@ function resolve(){
     showFlash('SAVED!', '#e8413a'); sfxCrowd(false);
     vibrate(35);                     // short tap on a save
   }
-  // opponent takes their kick (auto-simulated)
-  const oppScored = Math.random() < CFG.oppSkill;
-  S.oppResults.push(oppScored?'goal':'miss');
-  if(oppScored) S.oppGoals++;
-
   updateHUD();
   S.shot++;
   setTimeout(()=>{
@@ -285,14 +274,15 @@ function resolve(){
 
 function end(){
   S.phase='end'; stopLoop();
-  const me=S.goals, op=S.oppGoals;
-  $('end-num').textContent=`${me} – ${op}`;
-  let emoji,title,msg;
-  if(me>op){ emoji='🏆'; title='YOU WIN!'; msg=`${S.team.name} beat ${S.opp.name} ${me}–${op}!`; }
-  else if(me<op){ emoji='😔'; title='YOU LOSE'; msg=`${S.opp.name} edged it ${op}–${me}.`; }
-  else { emoji='🤝'; title='IT\'S A DRAW'; msg=`All square at ${me}–${op}.`; }
+  const g=S.goals, total=CFG.totalShots, saves=total-g;
+  $('end-num').textContent=`${g} / ${total}`;
+  let emoji,title,msg,col;
+  if(g===total){ emoji='🏆'; title='PERFECT!'; msg=`${S.team.name} scored every penalty!`; col='#2ecc55'; }
+  else if(g>saves){ emoji='🎉'; title='YOU WIN!'; msg=`You beat the keeper — ${g} of ${total} scored!`; col='#2ecc55'; }
+  else if(g===saves){ emoji='😬'; title='SO CLOSE'; msg=`The keeper matched you — ${g} of ${total}.`; col='#ffd23f'; }
+  else { emoji='🧤'; title='KEEPER WINS'; msg=`The keeper saved too many — only ${g} of ${total}.`; col='#e8413a'; }
   $('end-emoji').textContent=emoji; $('end-title').textContent=title; $('end-msg').textContent=msg;
-  document.getElementById('end-title').style.color = me>op ? '#2ecc55' : me<op ? '#e8413a' : '#ffd23f';
+  document.getElementById('end-title').style.color = col;
   show('end');
 }
 
@@ -311,7 +301,7 @@ function renderDots(el, results, isYou){
 }
 function updateHUD(){
   renderDots($('you-dots'), S.results, true);
-  renderDots($('opp-dots'), S.oppResults, false);
+  $('sb-goal-num').textContent = S.goals;
 }
 function showFlash(t,c){ flashText.textContent=t; flashText.style.color=c;
   flash.classList.remove('hidden'); flashText.style.animation='none'; void flashText.offsetWidth; flashText.style.animation=''; }
@@ -335,6 +325,28 @@ function spawnParticles(x,y){
   for(let i=0;i<46;i++){const a=Math.random()*Math.PI*2,sp=2+Math.random()*6;
     S.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,life:1,dec:0.018+Math.random()*0.02,r:3+Math.random()*4,c:cols[Math.floor(Math.random()*cols.length)]});}
 }
+// confetti cannons firing inward from the left and right edges
+function spawnSideConfetti(){
+  const W=canvas.width, H=canvas.height;
+  const cols=['#e23b3b','#2a6cf0','#1fb24a','#ffd23f','#ff7a5c','#19c6d6','#ffffff'];
+  const burst=(ox,oy,dir)=>{           // dir: +1 = aim right, -1 = aim left
+    for(let i=0;i<44;i++){
+      const sp=9+Math.random()*10;
+      const a=0.16+Math.random()*0.6;   // angle from vertical, fanned inward
+      S.particles.push({
+        x:ox, y:oy,
+        vx:Math.sin(a)*sp*dir, vy:-Math.cos(a)*sp,
+        life:1, dec:0.009+Math.random()*0.011,
+        shape:'rect', w:4+Math.random()*4, h:7+Math.random()*6,
+        rot:Math.random()*7, spin:(Math.random()-0.5)*0.4,
+        c:cols[Math.floor(Math.random()*cols.length)],
+      });
+    }
+  };
+  burst(W*0.01, H*0.74, 1);    // left cannon → inward
+  burst(W*0.99, H*0.74, -1);   // right cannon → inward
+}
+
 function spawnPuff(x,y){
   const cols=['#ffffff','#e9edf5','#cfd6e2','#ffd23f'];
   for(let i=0;i<18;i++){const a=Math.random()*Math.PI*2,sp=1+Math.random()*4;
@@ -398,7 +410,7 @@ function update(dt){
   // fx decay
   if(S.shake>0) S.shake=Math.max(0,S.shake-dt*40);
   if(S.ripple>0) S.ripple=Math.max(0,S.ripple-dt*1.6);
-  for(let i=S.particles.length-1;i>=0;i--){const p=S.particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.18;p.life-=p.dec;if(p.life<=0)S.particles.splice(i,1);}
+  for(let i=S.particles.length-1;i>=0;i--){const p=S.particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.18;p.vx*=0.99;if(p.spin)p.rot=(p.rot||0)+p.spin;p.life-=p.dec;if(p.life<=0)S.particles.splice(i,1);}
 }
 
 // ─────────── RENDER (bright cartoon stadium) ───────────
@@ -414,7 +426,12 @@ function render(){
   drawKeeper(W,H);
   drawBall();          // ball is in front of keeper, behind kicker
   drawKicker(W,H);
-  for(const p of S.particles){ctx.save();ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x,p.y,p.r*p.life,0,7);ctx.fill();ctx.restore();}
+  for(const p of S.particles){
+    ctx.save(); ctx.globalAlpha=Math.max(0,Math.min(1,p.life)); ctx.fillStyle=p.c;
+    if(p.shape==='rect'){ ctx.translate(p.x,p.y); ctx.rotate(p.rot||0); ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); }
+    else { ctx.beginPath(); ctx.arc(p.x,p.y,p.r*p.life,0,7); ctx.fill(); }
+    ctx.restore();
+  }
   ctx.restore();
 }
 

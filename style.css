@@ -209,6 +209,10 @@ body{background:
 .sb-dot.goal{background:#2ecc55;border-color:#1c8a38}
 .sb-dot.miss{background:#e8413a;border-color:#a32721}
 .sb-dot.current{background:#ffd23f;border-color:#c79400;box-shadow:0 0 9px rgba(255,210,63,.9)}
+.sb-goals{display:flex;align-items:baseline;gap:4px;font-family:'Luckiest Guy',cursive;
+  color:#fff;-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;text-shadow:0 2px 0 rgba(5,16,46,.5)}
+.sb-goals span{font-size:clamp(1.8rem,8vw,2.6rem);line-height:1}
+.sb-goals small{font-size:clamp(.9rem,3.6vw,1.2rem);-webkit-text-stroke:1px var(--ink);opacity:.85}
 
 /* ── flash text ── */
 #flash{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:30}
