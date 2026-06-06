@@ -15,6 +15,16 @@ const CFG = {
   keeperTopBonus:    0.82,  // reach multiplier for high shots (<1 = top corners are harder to save)
   keeperWrongGuess:  0.0,   // chance keeper fumbles a reachable ball (0 = glove always matches outcome)
   goalDiveShort:     0.35,  // on a GOAL, keeper dives only this fraction of its reach (clear visible gap)
+  // Swipe-to-aim controls
+  swipeSensX:   1.5,    // horizontal aim sensitivity (drag px → goal px)
+  powerSpan:    0.34,   // up-swipe of this fraction of screen height = full power
+  curveScale:   1.0,    // how strongly a curved swipe bends the ball
+  curveMax:     0.20,   // max bend as fraction of screen width
+  overThresh:   1.2,    // power above this sails over the bar (miss)
+  minSwipe:     22,     // px; shorter than this is ignored (teaches the swipe)
+  // Cinematic finish
+  slowmoScale:  0.42,   // time scale during the final kick
+  finalZoom:    1.5,    // camera zoom on the final kick
   // Goalkeeper kit (cartoon — black & yellow)
   gkShirt:  '#1f2330',
   gkTrim:   '#ffd23f',
@@ -87,6 +97,27 @@ function sfxWhistle(){ try{
   g.gain.setValueAtTime(0.25,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.2);
   o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+0.2);
 }catch(e){} }
+function sfxNet(){ try{           // net swish on a goal
+  const ac=audio(), b=ac.createBuffer(1,ac.sampleRate*0.25,ac.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++){const t=i/ac.sampleRate; d[i]=(Math.random()*2-1)*Math.exp(-t*14)*0.5;}
+  const s=ac.createBufferSource(); s.buffer=b;
+  const f=ac.createBiquadFilter(); f.type='highpass'; f.frequency.value=2500;
+  const g=ac.createGain(); g.gain.value=0.5;
+  s.connect(f); f.connect(g); g.connect(ac.destination); s.start();
+}catch(e){} }
+function sfxWhoosh(){ try{        // ball sails wide/over
+  const ac=audio(), o=ac.createOscillator(), g=ac.createGain();
+  o.type='sawtooth'; o.frequency.setValueAtTime(700,ac.currentTime); o.frequency.exponentialRampToValueAtTime(180,ac.currentTime+0.3);
+  g.gain.setValueAtTime(0.0001,ac.currentTime); g.gain.linearRampToValueAtTime(0.12,ac.currentTime+0.05); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.32);
+  const f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1200;
+  o.connect(f); f.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+0.34);
+}catch(e){} }
+
+// ─────────── COMMENTARY ───────────
+const GOAL_LINES=['TOP BINS! 🔥','WHAT A STRIKE!','UNSTOPPABLE!','GOLAZO! ⚽','IN OFF THE POST!','CLINICAL FINISH!','SENSATIONAL!','SENDS HIM THE WRONG WAY!'];
+const SAVE_LINES=['DENIED! 🧤','HUGE SAVE!','NO WAY THROUGH!','KEEPER SAYS NO!','GREAT HANDS!','READ IT PERFECTLY!'];
+const MISS_LINES=['SKIED IT! 😬','WAY OFF!','OFF TARGET!','OUCH…','THAT\'S IN THE STANDS!'];
+const pickLine=a=>a[Math.floor(Math.random()*a.length)];
 
 // ─────────── STATE ───────────
 const S = {
@@ -100,9 +131,16 @@ const S = {
   results:[],      // 'goal' | 'miss'
   state:'aim',     // aim | flying | done
   // ball
-  bx:0,by:0, tx:0,ty:0, anim:0, ballR:12,
+  bx:0,by:0, tx:0,ty:0, anim:0, ballR:12, curve:0, flightSpeed:1.7,
+  _outcome:'goal',  // goal | save | miss
   // keeper
-  kx:0, kTarget:0, kLunge:0, kBob:0,
+  kx:0, kTarget:0, kLunge:0, kBob:0, keeperCele:0,
+  // swipe aim
+  aiming:false, sx:0, sy:0, ax:0, ay:0, swipePts:[], aim:null,
+  // camera
+  zoom:1, zoomTarget:1, camFX:0, camFY:0, timeScale:1, timeScaleTarget:1,
+  // replay
+  bestGoal:null, replay:false,
   // fx
   shake:0, ripple:0, particles:[],
   raf:null, last:0,
@@ -174,6 +212,8 @@ if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{ if(S.
 function start(){
   audio(); // unlock audio on user gesture
   S.phase='game'; S.shot=0; S.goals=0; S.results=[]; S.particles=[];
+  S.bestGoal=null; S.replay=false;
+  S.zoom=1; S.zoomTarget=1; S.timeScale=1; S.timeScaleTarget=1;
   document.documentElement.style.setProperty('--accent', S.team.accent);
   $('you-flag').textContent=S.team.flag; $('you-name').textContent=S.team.name;
   show('game'); resize(); updateHUD();
@@ -185,8 +225,8 @@ function start(){
   // chosen-country flag flourish, then start play
   playKickoffFlag(S.team, ()=>{
     sfxWhistle();
-    hintEl.classList.remove('hide'); hintEl.textContent='Tap where you want to shoot!';
-    setTimeout(()=>hintEl.classList.add('hide'), 2600);
+    hintEl.classList.remove('hide'); hintEl.textContent='Swipe to aim — flick to curve it!';
+    setTimeout(()=>hintEl.classList.add('hide'), 3000);
     newShot();
   });
 }
@@ -208,68 +248,102 @@ function newShot(){
   S.kx=0; S.kTarget=0; S.kLunge=0;
   S.kPatrol=Math.random()*Math.PI*2; S.kBaseX=0; S.kDiveX=0;
   S.ripple=0; S.kickAnim=0;
+  S.curve=0; S.over=false; S.wide=false; S.keeperCele=0;
+  S.aim=null; S.aiming=false; S.zoomTarget=1; S.timeScaleTarget=1;
   updateHUD();
 }
 function spotY(){ return canvas.height*0.66; }   // penalty-spot / ball start Y
 
-function shoot(px,py){
+function shoot(aim){
   if(S.state!=='aim') return;
-  const g=goal();
-  // shot lands where you tapped (clamped inside the goal mouth)
-  S.tx = Math.max(g.x+20, Math.min(px, g.x+g.w-20));
-  S.ty = Math.max(g.y+15, Math.min(py, g.y+g.h-15));
-  S.state='flying'; S.anim=0; S.kickAnim=0.0001;
+  const g=goal(), W=canvas.width;
+  S.tx=aim.tx; S.ty=aim.ty; S.curve=aim.curve; S.power=aim.power; S.over=aim.over; S.wide=aim.wide;
+  S.flightSpeed=CFG.ballSpeed*(0.85+aim.power*0.45);     // harder swipe = faster ball
+  S.state='flying'; S.anim=0; S.kickAnim=0.0001; S.ballR0=S.ballR;
   hintEl.classList.add('hide');
   sfxKick();
 
-  // Save depends on the keeper's CURRENT (patrol) position vs. where the ball goes
-  const W=canvas.width;
-  const ballOff   = S.tx - W/2;       // ball offset from centre
-  const keeperOff = S.kBaseX;         // keeper's position when you shot
-  let reach = CFG.keeperReach*g.w;
-  if(S.ty < g.y + g.h*0.42) reach *= CFG.keeperTopBonus;   // high shots harder to reach
-  let saved = Math.abs(ballOff - keeperOff) <= reach;
-  if(saved && Math.random() < CFG.keeperWrongGuess) saved = false;  // occasional fumble
-  S._saved = saved;
-
-  const maxDive = g.w*0.42;
-  const dir = Math.sign(ballOff - keeperOff) || 1;
-  if(saved){
-    // keeper REACHES the ball; ball will be parried back out
-    S.kDiveX = Math.max(-maxDive, Math.min(ballOff, maxDive));
-    S.saveX = S.tx; S.saveY = S.ty;                 // interception point (at the gloves)
-    S.reboundX = clamp(S.tx + dir*W*0.18, g.x-W*0.05, g.x+g.w+W*0.05);
-    S.reboundY = spotY()*0.95;                        // comes back down toward the taker
+  if(aim.over || aim.wide){
+    // ball misses on its own — keeper stays put
+    S._outcome='miss'; S.kDiveX=S.kBaseX; S.kTarget=0;
   } else {
-    // GOAL: keeper commits the WRONG way (dives away from the ball) — path is clearly open
-    S.kDiveX = clamp(keeperOff - dir*maxDive*0.7, -maxDive, maxDive);
+    // save depends on the keeper's CURRENT (patrol) position vs. where the ball goes
+    const ballOff=S.tx-W/2, keeperOff=S.kBaseX;
+    let reach=CFG.keeperReach*g.w;
+    if(S.ty < g.y+g.h*0.42) reach*=CFG.keeperTopBonus;
+    const saved=(Math.abs(ballOff-keeperOff)<=reach) && (Math.random()>=CFG.keeperWrongGuess);
+    const maxDive=g.w*0.42, dir=Math.sign(ballOff-keeperOff)||1;
+    if(saved){
+      S._outcome='save';
+      S.kDiveX=clamp(ballOff,-maxDive,maxDive);
+      S.saveX=S.tx; S.saveY=S.ty;
+      S.reboundX=clamp(S.tx+dir*W*0.18, g.x-W*0.05, g.x+g.w+W*0.05);
+      S.reboundY=spotY()*0.95;
+    } else {
+      S._outcome='goal';
+      S.kDiveX=clamp(keeperOff-dir*maxDive*0.7,-maxDive,maxDive);  // commits the wrong way
+    }
+    S.kTarget=clamp((S.kDiveX-keeperOff)/(g.w*0.30),-1,1);
   }
-  S.kTarget = Math.max(-1, Math.min((S.kDiveX - keeperOff)/(g.w*0.30), 1));
-  S.ballR0 = S.ballR;
+
+  // cinematic slow-mo + zoom on the final kick of the round
+  if(!S.replay && S.shot===CFG.totalShots-1) startCinematic();
 }
+
+function startCinematic(){
+  const g=goal();
+  S.camFX=canvas.width/2; S.camFY=g.y+g.h*0.5;
+  S.zoomTarget=CFG.finalZoom; S.timeScaleTarget=CFG.slowmoScale;
+}
+function endCinematic(){ S.zoomTarget=1; S.timeScaleTarget=1; }
 
 function resolve(){
   S.state='done';
-  const scored = !S._saved;
-  if(scored){
+
+  // replay mode: celebrate the goal again, then return to the end screen
+  if(S.replay){
+    S.ripple=1.2; S.shake=CFG.shakeMag; spawnParticles(S.tx,S.ty); spawnSideConfetti();
+    showFlash('GOAL!', 'REPLAY ⚽', '#2ecc55'); sfxCrowd(true); sfxNet(); vibrate([60,40,120]);
+    setTimeout(()=>{ hideFlash(); endCinematic(); S.replay=false; S.phase='end'; stopLoop(); show('end'); }, 1800);
+    return;
+  }
+
+  const o=S._outcome;
+  if(o==='goal'){
     S.goals++; S.results.push('goal');
     S.ripple=1.2; S.shake=CFG.shakeMag; spawnParticles(S.tx,S.ty); spawnSideConfetti();
-    showFlash('GOAL!', '#2ecc55'); sfxCrowd(true);
-    vibrate([60,40,120]);            // celebratory buzz on a goal
-  } else {
-    S.results.push('miss');
-    spawnPuff(S.saveX, S.saveY);     // grey "block" burst at the gloves
-    S.shake=CFG.shakeMag*0.4;
-    showFlash('SAVED!', '#e8413a'); sfxCrowd(false);
-    vibrate(35);                     // short tap on a save
+    showFlash('GOAL!', pickLine(GOAL_LINES), '#2ecc55'); sfxCrowd(true); sfxNet();
+    vibrate([60,40,120]);
+    captureBestGoal();
+  } else if(o==='save'){
+    S.results.push('miss'); S.keeperCele=0.0001;
+    spawnPuff(S.saveX, S.saveY); S.shake=CFG.shakeMag*0.4;
+    showFlash('SAVED!', pickLine(SAVE_LINES), '#e8413a'); sfxCrowd(false);
+    vibrate(35);
+  } else { // miss (over/wide)
+    S.results.push('miss'); S.shake=CFG.shakeMag*0.3;
+    showFlash(S.over?'OVER!':'WIDE!', pickLine(MISS_LINES), '#ffb020'); sfxWhoosh();
+    vibrate(20);
   }
   updateHUD();
   S.shot++;
+  const wait=(S.timeScaleTarget<1)?2300:1500;   // linger on the cinematic final kick
   setTimeout(()=>{
-    hideFlash();
+    hideFlash(); endCinematic();
     if(S.shot>=CFG.totalShots) end();
     else newShot();
-  }, 1500);
+  }, wait);
+}
+
+// remember the prettiest goal (corner + height + curve) for the replay
+function captureBestGoal(){
+  const g=goal();
+  const corner=Math.abs(S.tx-canvas.width/2)/(g.w/2);
+  const high=1-(S.ty-g.y)/g.h;
+  const score=corner*1.2 + high + Math.abs(S.curve)/(canvas.width*0.08);
+  if(!S.bestGoal || score>S.bestGoal.score){
+    S.bestGoal={ score, tx:S.tx, ty:S.ty, curve:S.curve, power:S.power, kBaseX:S.kBaseX };
+  }
 }
 
 function end(){
@@ -283,8 +357,28 @@ function end(){
   else { emoji='🧤'; title='KEEPER WINS'; msg=`The keeper saved too many — only ${g} of ${total}.`; col='#e8413a'; }
   $('end-emoji').textContent=emoji; $('end-title').textContent=title; $('end-msg').textContent=msg;
   document.getElementById('end-title').style.color = col;
+  $('btn-replay').classList.toggle('hidden', !S.bestGoal);
   show('end');
 }
+
+// re-play the prettiest goal of the round in slow-mo with a zoom
+function replayBest(){
+  if(!S.bestGoal) return;
+  const b=S.bestGoal, g=goal(), maxDive=g.w*0.42;
+  S.phase='game'; show('game'); resize();
+  S.replay=true; S.state='flying'; S.anim=0; S.kickAnim=0.0001; S.particles=[];
+  S._outcome='goal';
+  S.tx=b.tx; S.ty=b.ty; S.curve=b.curve; S.power=b.power;
+  S.flightSpeed=CFG.ballSpeed*(0.85+b.power*0.45);
+  S.bx=canvas.width/2; S.by=spotY(); S.ballR=Math.max(12,canvas.width*0.022); S.ballR0=S.ballR;
+  S.kBaseX=b.kBaseX; S.kx=b.kBaseX; S.kLunge=0; S.keeperCele=0;
+  const dir=Math.sign((b.tx-canvas.width/2)-b.kBaseX)||1;
+  S.kDiveX=clamp(b.kBaseX-dir*maxDive*0.7,-maxDive,maxDive);
+  S.kTarget=clamp((S.kDiveX-b.kBaseX)/(g.w*0.30),-1,1);
+  startCinematic();
+  stopLoop(); S.last=performance.now(); S.raf=requestAnimationFrame(loop);
+}
+$('btn-replay').addEventListener('click', replayBest);
 
 // ─────────── HUD (scoreboard dot rows) ───────────
 function renderDots(el, results, isYou){
@@ -303,14 +397,65 @@ function updateHUD(){
   renderDots($('you-dots'), S.results, true);
   $('sb-goal-num').textContent = S.goals;
 }
-function showFlash(t,c){ flashText.textContent=t; flashText.style.color=c;
-  flash.classList.remove('hidden'); flashText.style.animation='none'; void flashText.offsetWidth; flashText.style.animation=''; }
+function showFlash(t,sub,c){ flashText.textContent=t; flashText.style.color=c;
+  const se=$('flash-sub'); se.textContent=sub||'';
+  flash.classList.remove('hidden');
+  flashText.style.animation='none'; void flashText.offsetWidth; flashText.style.animation='';
+  se.style.animation='none'; void se.offsetWidth; se.style.animation=''; }
 function hideFlash(){ flash.classList.add('hidden'); }
 
-// ─────────── INPUT ───────────
-function pt(e){ const r=canvas.getBoundingClientRect(); const s=e.touches?e.touches[0]:e; return {x:s.clientX-r.left,y:s.clientY-r.top}; }
-canvas.addEventListener('click', e=>{ const p=pt(e); shoot(p.x,p.y); });
-canvas.addEventListener('touchstart', e=>{ e.preventDefault(); const p=pt(e); shoot(p.x,p.y); }, {passive:false});
+// ─────────── INPUT (swipe to aim, flick to curve) ───────────
+function pt(e){ const r=canvas.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+canvas.addEventListener('pointerdown', e=>{
+  if(S.state!=='aim') return;
+  e.preventDefault();
+  const p=pt(e); S.aiming=true; S.sx=p.x; S.sy=p.y; S.ax=p.x; S.ay=p.y;
+  S.swipePts=[{x:p.x,y:p.y}];
+  try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+  hintEl.classList.add('hide');
+});
+canvas.addEventListener('pointermove', e=>{
+  if(!S.aiming) return;
+  const p=pt(e); S.ax=p.x; S.ay=p.y;
+  S.swipePts.push({x:p.x,y:p.y});
+  if(S.swipePts.length>40) S.swipePts.shift();
+  S.aim=computeAim();
+});
+function endAim(e){
+  if(!S.aiming) return; S.aiming=false;
+  const dist=Math.hypot(S.ax-S.sx, S.ay-S.sy);
+  S.aim=computeAim();
+  if(dist<CFG.minSwipe || !S.aim.valid){
+    // too small / not an up-swipe — show a nudge, don't shoot
+    hintEl.classList.remove('hide'); hintEl.textContent='Swipe up toward the goal — flick to curve!';
+    S.aim=null; return;
+  }
+  shoot(S.aim);
+  S.aim=null;
+}
+canvas.addEventListener('pointerup', endAim);
+canvas.addEventListener('pointercancel', ()=>{ S.aiming=false; S.aim=null; });
+
+// turn the current swipe into an aim {tx,ty,power,curve,over,wide,valid}
+function computeAim(){
+  const g=goal(), W=canvas.width, H=canvas.height;
+  const vx=S.ax-S.sx, vy=S.ay-S.sy;
+  const power=clamp(-vy/(H*CFG.powerSpan), 0, 1.35);     // up-swipe length
+  const rawX=W/2 + vx*CFG.swipeSensX;
+  let ty=lerp(g.y+g.h*0.86, g.y+g.h*0.08, clamp(power,0,1));
+  let over=false, wide=false;
+  if(power>CFG.overThresh){ over=true; ty=g.y - g.h*0.14; }
+  if(rawX < g.x - g.w*0.04 || rawX > g.x+g.w+g.w*0.04) wide=true;
+  const tx=clamp(rawX, g.x - g.w*0.12, g.x+g.w+g.w*0.12);
+  const curve=clamp(swipeBow(), -W*CFG.curveMax, W*CFG.curveMax) * CFG.curveScale;
+  return { tx, ty, power, curve, over, wide, valid: power>0.08 && vy<0 };
+}
+// horizontal "bow" of the swipe path → curve amount
+function swipeBow(){
+  const p=S.swipePts; if(p.length<4) return 0;
+  const a=p[0], b=p[p.length-1], m=p[Math.floor(p.length/2)];
+  return m.x - (a.x+b.x)/2;
+}
 
 // ─────────── GEOMETRY ───────────
 function goal(){
@@ -356,7 +501,11 @@ function spawnPuff(x,y){
 // ─────────── LOOP ───────────
 function stopLoop(){ if(S.raf){cancelAnimationFrame(S.raf); S.raf=null;} }
 function loop(ts){
-  const dt=Math.min((ts-S.last)/1000,0.05); S.last=ts;
+  const real=Math.min((ts-S.last)/1000,0.05); S.last=ts;
+  // ease camera + slow-mo with real (unscaled) time
+  S.zoom += (S.zoomTarget-S.zoom)*Math.min(1,real*6);
+  S.timeScale += (S.timeScaleTarget-S.timeScale)*Math.min(1,real*6);
+  const dt = real * S.timeScale;     // slow-mo scales gameplay time only
   update(dt); render();
   S.raf=requestAnimationFrame(loop);
 }
@@ -368,34 +517,36 @@ function update(dt){
   if(S.kickAnim>0 && S.kickAnim<1) S.kickAnim=Math.min(1,S.kickAnim+dt*4);
   // ball flight
   if(S.state==='flying'){
-    S.anim += dt*CFG.ballSpeed;
+    S.anim += dt*S.flightSpeed;
     if(S.anim>=1){ S.anim=1; resolve(); }
     const W=canvas.width, R0=S.ballR0||canvas.width*0.022, sy=spotY();
-    if(S._saved){
-      // fly to the gloves (tc), then rebound back OUT toward the taker
+    const curveOff = S.curve*Math.sin(Math.PI*Math.min(S.anim,1));   // bends mid-flight
+    if(S._outcome==='save'){
       const tc=0.62;
       if(S.anim<=tc){
         const t=ease(S.anim/tc);
-        S.bx=lerp(W/2,S.saveX,t); S.by=lerp(sy,S.saveY,t);
-        S.ballR=lerp(R0,R0*0.55,t);              // shrinks going away
+        S.bx=lerp(W/2,S.saveX,t)+curveOff; S.by=lerp(sy,S.saveY,t);
+        S.ballR=lerp(R0,R0*0.55,t);
       } else {
         const t=ease((S.anim-tc)/(1-tc));
         S.bx=lerp(S.saveX,S.reboundX,t); S.by=lerp(S.saveY,S.reboundY,t);
-        S.ballR=lerp(R0*0.55,R0*1.0,t);          // grows coming back = clearly OUT
+        S.ballR=lerp(R0*0.55,R0*1.0,t);
       }
-      S.kLunge=Math.min(1, S.anim/tc);           // keeper arrives at contact
+      S.kLunge=Math.min(1, S.anim/tc);
     } else {
-      // GOAL: ball flies all the way into the net
+      // GOAL or MISS: ball flies to its target (curving on the way)
       const t=ease(S.anim);
-      S.bx=lerp(W/2,S.tx,t); S.by=lerp(sy,S.ty,t);
-      S.ballR=lerp(R0,R0*0.5,t);                 // shrinks into the goal (depth)
+      S.bx=lerp(W/2,S.tx,t)+curveOff; S.by=lerp(sy,S.ty,t);
+      S.ballR=lerp(R0, R0*(S._outcome==='miss'?0.38:0.5), t);
       S.kLunge=Math.min(1, S.anim*1.25);
     }
   }
   if(S.state==='done'){
-    // ball settles slightly into net after goal
-    S.kLunge = Math.min(1, S.kLunge+dt*2);
+    S.kLunge=Math.min(1, S.kLunge+dt*2);
+    if(S._outcome==='save') S.keeperCele=Math.min(1, S.keeperCele+dt*1.8);  // keeper celebrates
   }
+  // live aim recompute (keeper may have moved since pointermove)
+  if(S.aiming) S.aim=computeAim();
   // keeper x position
   const g=goal();
   if(S.state==='aim'){
@@ -418,6 +569,7 @@ function render(){
   const W=canvas.width,H=canvas.height;
   ctx.save();
   if(S.shake>0) ctx.translate((Math.random()-0.5)*S.shake,(Math.random()-0.5)*S.shake);
+  if(S.zoom>1.001){ ctx.translate(S.camFX,S.camFY); ctx.scale(S.zoom,S.zoom); ctx.translate(-S.camFX,-S.camFY); }
 
   drawSky(W,H);
   drawStands(W,H);
@@ -426,12 +578,35 @@ function render(){
   drawKeeper(W,H);
   drawBall();          // ball is in front of keeper, behind kicker
   drawKicker(W,H);
+  if(S.aiming && S.aim) drawAimPreview();
   for(const p of S.particles){
     ctx.save(); ctx.globalAlpha=Math.max(0,Math.min(1,p.life)); ctx.fillStyle=p.c;
     if(p.shape==='rect'){ ctx.translate(p.x,p.y); ctx.rotate(p.rot||0); ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); }
     else { ctx.beginPath(); ctx.arc(p.x,p.y,p.r*p.life,0,7); ctx.fill(); }
     ctx.restore();
   }
+  ctx.restore();
+}
+
+// dotted predicted trajectory + target crosshair while aiming
+function drawAimPreview(){
+  const a=S.aim, W=canvas.width, sy=spotY();
+  const bad=a.over||a.wide;
+  const col = bad ? 'rgba(232,65,58,.95)' : 'rgba(255,255,255,.95)';
+  ctx.save();
+  ctx.strokeStyle=col; ctx.lineWidth=Math.max(2.5,W*0.007); ctx.lineCap='round';
+  ctx.setLineDash([W*0.018, W*0.024]);
+  ctx.beginPath();
+  for(let i=0;i<=22;i++){ const t=i/22, e=ease(t);
+    const x=lerp(W/2,a.tx,e)+a.curve*Math.sin(Math.PI*t), y=lerp(sy,a.ty,e);
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+  ctx.stroke(); ctx.setLineDash([]);
+  // target crosshair
+  const r=W*0.026;
+  ctx.beginPath(); ctx.arc(a.tx,a.ty,r,0,7); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(a.tx-r*1.5,a.ty); ctx.lineTo(a.tx+r*1.5,a.ty);
+  ctx.moveTo(a.tx,a.ty-r*1.5); ctx.lineTo(a.tx,a.ty+r*1.5); ctx.stroke();
   ctx.restore();
 }
 
@@ -541,6 +716,35 @@ function drawKeeper(W,H){
   const u=g.w*0.07;                       // unit scale (keeper size relative to goal)
   const baseX=W/2 + S.kx;
   const baseY=g.y+g.h+u*0.2;              // stand on the goal line
+
+  // ── celebration: pops up with arms aloft after a save ──
+  if(S.state==='done' && S._outcome==='save' && S.keeperCele>0){
+    const c=ease(Math.min(1,S.keeperCele));
+    const jump=Math.abs(Math.sin(S.keeperCele*Math.PI*2))*u*1.1*c;
+    const hy=-u*3.5 - c*u*0.5;
+    ctx.save();
+    ctx.translate(baseX, baseY-jump);
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(0,u*0.3+jump,u*2.2,u*0.55,0,0,7); ctx.fill();
+    // arms up in a V
+    ctx.lineWidth=u*0.85; ctx.strokeStyle=CFG.gkShirt;
+    ctx.beginPath(); ctx.moveTo(-u*0.9,-u*2.3); ctx.lineTo(-u*1.7,hy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo( u*0.9,-u*2.3); ctx.lineTo( u*1.7,hy); ctx.stroke();
+    [[-u*1.7,hy],[u*1.7,hy]].forEach(([x,y])=>{ctx.beginPath();ctx.arc(x,y,u*0.55,0,7);ol(CFG.gkTrim,2);});
+    // body
+    ctx.beginPath(); ctx.roundRect(-u*1.1,-u*2.7,u*2.2,u*3.0,u*0.6); ol(CFG.gkShirt,3);
+    ctx.fillStyle=CFG.gkTrim; ctx.fillRect(-u*1.1,-u*1.5,u*2.2,u*0.4);
+    // legs
+    ctx.lineWidth=u*0.85; ctx.strokeStyle=CFG.gkShirt;
+    ctx.beginPath(); ctx.moveTo(-u*0.5,u*0.2); ctx.lineTo(-u*0.6,u*1.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo( u*0.5,u*0.2); ctx.lineTo( u*0.6,u*1.7); ctx.stroke();
+    // head
+    ctx.beginPath(); ctx.arc(0,-u*3.4,u*0.85,0,7); ol(CFG.gkSkin,3);
+    ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(0,-u*3.7,u*0.86,Math.PI,0,false); ctx.fill();
+    ctx.restore();
+    return;
+  }
+
   const lunge=ease(S.kLunge);
   const dir=S.kTarget;                    // -1..1 dive direction
   const tilt=dir*lunge*1.15;              // rotate toward horizontal when diving
