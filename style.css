@@ -59,7 +59,7 @@ body{background:
 /* ── card (menu + end) — bright cartoon panel ── */
 .menu-card{
   width:min(92vw,400px);
-  max-height:calc(100dvh - var(--sat) - var(--sab) - 78px);
+  max-height:calc(100dvh - var(--sat) - var(--sab) - 72px);
   overflow-y:auto;-webkit-overflow-scrolling:touch;
   background:linear-gradient(180deg,#ffffff,#eef5ff);
   border:3px solid var(--ink);
@@ -109,9 +109,10 @@ body{background:
 .hint{color:#5a6b8c;font-size:.78rem;letter-spacing:.5px}
 
 /* credit line at the bottom of the onboarding */
-.credit{position:absolute;left:0;right:0;bottom:calc(var(--sab) + 12px);text-align:center;
-  font-family:'Russo One',sans-serif;font-size:clamp(.72rem,3.2vw,.85rem);letter-spacing:.3px;
-  color:#0e3a22;text-shadow:0 1px 2px rgba(255,255,255,.55);padding:0 12px}
+.credit{position:absolute;left:0;right:0;bottom:calc(var(--sab) + 8px);text-align:center;
+  font-family:'Baloo 2','Russo One',sans-serif;font-weight:700;font-size:clamp(.68rem,3.4vw,.95rem);letter-spacing:.2px;line-height:1.05;
+  white-space:nowrap;color:#0c3a1f;text-shadow:0 1px 2px rgba(255,255,255,.6);padding:0 8px}
+.credit a{font-weight:800}
 .credit a{color:#0b54c9;font-weight:700;text-decoration:underline;text-underline-offset:2px}
 .credit a:hover{color:#e23b3b}
 
