@@ -113,6 +113,61 @@ function sfxWhoosh(){ try{        // ball sails wide/over
   o.connect(f); f.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+0.34);
 }catch(e){} }
 
+function sfxBadge(){ try{   // pleasant two-note chime on a badge
+  const ac=audio();
+  [880,1320].forEach((f,i)=>{ const o=ac.createOscillator(), g=ac.createGain();
+    o.type='triangle'; o.frequency.value=f;
+    const t0=ac.currentTime+i*0.09;
+    g.gain.setValueAtTime(0.0001,t0); g.gain.linearRampToValueAtTime(0.16,t0+0.02); g.gain.exponentialRampToValueAtTime(0.001,t0+0.25);
+    o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0+0.26); });
+}catch(e){} }
+
+// ─────────── ACHIEVEMENTS (toast pop-ups) ───────────
+const ACHS = {
+  hattrick:{ e:'🔥', n:'Hat-trick' },
+  perfect: { e:'🏆', n:'Perfect 5/5' },
+  panenka: { e:'🎩', n:'Panenka' },
+  topbins: { e:'🎯', n:'Top Bins' },
+  curler:  { e:'🌀', n:'Curler' },
+};
+function loadAchs(){ try{ return new Set(JSON.parse(localStorage.getItem('sk-achs')||'[]')); }catch(e){ return new Set(); } }
+let achUnlocked = loadAchs();
+function saveAchs(){ try{ localStorage.setItem('sk-achs', JSON.stringify([...achUnlocked])); }catch(e){} }
+let toastQ=[], toastBusy=false;
+function award(id){
+  const a=ACHS[id]; if(!a) return;
+  const isNew=!achUnlocked.has(id);
+  if(isNew){ achUnlocked.add(id); saveAchs(); }
+  toastQ.push({ e:a.e, n:a.n, tag:isNew?'Achievement unlocked!':'Nice one!' });
+  if(!toastBusy) nextToast();
+}
+function nextToast(){
+  if(!toastQ.length){ toastBusy=false; return; }
+  toastBusy=true;
+  const t=toastQ.shift(), el=$('toast');
+  $('toast-emoji').textContent=t.e; $('toast-name').textContent=t.n; $('toast-tag').textContent=t.tag;
+  hintEl.classList.add('hide');
+  el.classList.remove('hidden','show'); void el.offsetWidth; el.classList.add('show');
+  sfxBadge();
+  clearTimeout(S._toastT);
+  S._toastT=setTimeout(()=>{
+    el.classList.remove('show');
+    setTimeout(()=>{ if(!toastQ.length) el.classList.add('hidden'); nextToast(); }, 380);
+  }, 2000);
+}
+// check feats earned by the goal that just went in
+function checkGoalFeats(){
+  const W=canvas.width, g=goal();
+  S.streak=(S.streak||0)+1;
+  if(S.streak===3) award('hattrick');
+  const central=Math.abs(S.tx-W/2) < g.w*0.12;
+  const topCorner=(S.ty < g.y+g.h*0.30) && Math.abs(S.tx-W/2) > g.w*0.28;
+  if(central && S.power<0.36) award('panenka');
+  if(topCorner) award('topbins');
+  if(Math.abs(S.curve) > W*0.05) award('curler');
+  if(S.goals===CFG.totalShots) award('perfect');
+}
+
 // ─────────── COMMENTARY ───────────
 const GOAL_LINES=['TOP BINS! 🔥','WHAT A STRIKE!','UNSTOPPABLE!','GOLAZO! ⚽','IN OFF THE POST!','CLINICAL FINISH!','SENSATIONAL!','SENDS HIM THE WRONG WAY!'];
 const SAVE_LINES=['DENIED! 🧤','HUGE SAVE!','NO WAY THROUGH!','KEEPER SAYS NO!','GREAT HANDS!','READ IT PERFECTLY!'];
@@ -212,8 +267,9 @@ if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{ if(S.
 function start(){
   audio(); // unlock audio on user gesture
   S.phase='game'; S.shot=0; S.goals=0; S.results=[]; S.particles=[];
-  S.bestGoal=null; S.replay=false;
+  S.bestGoal=null; S.replay=false; S.streak=0;
   S.zoom=1; S.zoomTarget=1; S.timeScale=1; S.timeScaleTarget=1;
+  toastQ=[]; toastBusy=false; clearTimeout(S._toastT); $('toast').classList.add('hidden');
   document.documentElement.style.setProperty('--accent', S.team.accent);
   $('you-flag').textContent=S.team.flag; $('you-name').textContent=S.team.name;
   show('game'); resize(); updateHUD();
@@ -315,13 +371,14 @@ function resolve(){
     showFlash('GOAL!', pickLine(GOAL_LINES), '#2ecc55'); sfxCrowd(true); sfxNet();
     vibrate([60,40,120]);
     captureBestGoal();
+    checkGoalFeats();              // badge toasts for special goals
   } else if(o==='save'){
-    S.results.push('miss'); S.keeperCele=0.0001;
+    S.results.push('miss'); S.keeperCele=0.0001; S.streak=0;
     spawnPuff(S.saveX, S.saveY); S.shake=CFG.shakeMag*0.4;
     showFlash('SAVED!', pickLine(SAVE_LINES), '#e8413a'); sfxCrowd(false);
     vibrate(35);
   } else { // miss (over/wide)
-    S.results.push('miss'); S.shake=CFG.shakeMag*0.3;
+    S.results.push('miss'); S.shake=CFG.shakeMag*0.3; S.streak=0;
     showFlash(S.over?'OVER!':'WIDE!', pickLine(MISS_LINES), '#ffb020'); sfxWhoosh();
     vibrate(20);
   }
