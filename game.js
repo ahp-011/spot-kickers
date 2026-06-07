@@ -196,6 +196,8 @@ const S = {
   zoom:1, zoomTarget:1, camFX:0, camFY:0, timeScale:1, timeScaleTarget:1,
   // replay
   bestGoal:null, replay:false,
+  // pause / tutorial / scheduled transition
+  paused:false, tutorialOpen:false, pending:null,
   // fx
   shake:0, ripple:0, particles:[],
   raf:null, last:0,
@@ -246,6 +248,37 @@ $('btn-play').addEventListener('click', start);
 $('btn-again').addEventListener('click', start);
 $('btn-menu').addEventListener('click', ()=>{ stopLoop(); show('menu'); });
 
+// ─────────── PAUSE & TUTORIAL ───────────
+function showControls(on){ $('ctrl-pause').classList.toggle('hidden',!on); $('ctrl-help').classList.toggle('hidden',!on); }
+function openPause(){
+  if(S.phase!=='game' || S.state==='intro' || S.tutorialOpen || S.paused) return;
+  S.paused=true; stopLoop(); $('pause').classList.remove('hidden');
+}
+function resumeGame(){
+  $('pause').classList.add('hidden');
+  if(!S.paused) return; S.paused=false;
+  S.last=performance.now(); if(!S.raf) S.raf=requestAnimationFrame(loop);
+}
+function quitToMenu(){
+  S.paused=false; S.pending=null; stopLoop();
+  $('pause').classList.add('hidden'); $('tutorial').classList.add('hidden');
+  hideFlash(); showControls(false); S.phase='menu'; show('menu');
+}
+function tutorialSeen(){ try{ return localStorage.getItem('sk-tut')==='1'; }catch(e){ return false; } }
+function openTutorial(){ S.tutorialOpen=true; $('tutorial').classList.remove('hidden'); }
+function closeTutorial(){
+  S.tutorialOpen=false; try{ localStorage.setItem('sk-tut','1'); }catch(e){}
+  $('tutorial').classList.add('hidden');
+  if(S._tutFromPause){ S._tutFromPause=false; $('pause').classList.remove('hidden'); }
+  else { hintEl.classList.remove('hide'); hintEl.textContent='Swipe to aim — flick to curve it!'; setTimeout(()=>hintEl.classList.add('hide'),2600); }
+}
+$('ctrl-pause').addEventListener('click', openPause);
+$('ctrl-help').addEventListener('click', ()=>{ if(!S.tutorialOpen && !S.paused) openTutorial(); });
+$('btn-resume').addEventListener('click', resumeGame);
+$('btn-quit').addEventListener('click', quitToMenu);
+$('btn-howto').addEventListener('click', ()=>{ $('pause').classList.add('hidden'); S._tutFromPause=true; openTutorial(); });
+$('btn-tut').addEventListener('click', closeTutorial);
+
 // ─────────── CANVAS SIZE (full-bleed, all phones) ───────────
 function resize(){
   const sg = $('screen-game');
@@ -268,8 +301,10 @@ function start(){
   audio(); // unlock audio on user gesture
   S.phase='game'; S.shot=0; S.goals=0; S.results=[]; S.particles=[];
   S.bestGoal=null; S.replay=false; S.streak=0;
+  S.paused=false; S.tutorialOpen=false; S.pending=null; S._tutFromPause=false;
   S.zoom=1; S.zoomTarget=1; S.timeScale=1; S.timeScaleTarget=1;
   toastQ=[]; toastBusy=false; clearTimeout(S._toastT); $('toast').classList.add('hidden');
+  $('pause').classList.add('hidden'); $('tutorial').classList.add('hidden'); showControls(false);
   document.documentElement.style.setProperty('--accent', S.team.accent);
   $('you-flag').textContent=S.team.flag; $('you-name').textContent=S.team.name;
   show('game'); resize(); updateHUD();
@@ -281,9 +316,14 @@ function start(){
   // chosen-country flag flourish, then start play
   playKickoffFlag(S.team, ()=>{
     sfxWhistle();
-    hintEl.classList.remove('hide'); hintEl.textContent='Swipe to aim — flick to curve it!';
-    setTimeout(()=>hintEl.classList.add('hide'), 3000);
+    showControls(true);
     newShot();
+    if(!tutorialSeen()){
+      openTutorial();                 // first-ever game: teach the swipe
+    } else {
+      hintEl.classList.remove('hide'); hintEl.textContent='Swipe to aim — flick to curve it!';
+      setTimeout(()=>hintEl.classList.add('hide'), 3000);
+    }
   });
 }
 
@@ -360,7 +400,7 @@ function resolve(){
   if(S.replay){
     S.ripple=1.2; S.shake=CFG.shakeMag; spawnParticles(S.tx,S.ty); spawnSideConfetti();
     showFlash('GOAL!', 'REPLAY ⚽', '#2ecc55'); sfxCrowd(true); sfxNet(); vibrate([60,40,120]);
-    setTimeout(()=>{ hideFlash(); endCinematic(); S.replay=false; S.phase='end'; stopLoop(); show('end'); }, 1800);
+    S.pending={ remain:1.8, fn:()=>{ hideFlash(); endCinematic(); S.replay=false; S.phase='end'; stopLoop(); show('end'); } };
     return;
   }
 
@@ -384,12 +424,12 @@ function resolve(){
   }
   updateHUD();
   S.shot++;
-  const wait=(S.timeScaleTarget<1)?2300:1500;   // linger on the cinematic final kick
-  setTimeout(()=>{
+  const wait=(S.timeScaleTarget<1)?2.3:1.5;   // linger on the cinematic final kick
+  S.pending={ remain:wait, fn:()=>{
     hideFlash(); endCinematic();
     if(S.shot>=CFG.totalShots) end();
     else newShot();
-  }, wait);
+  }};
 }
 
 // remember the prettiest goal (corner + height + curve) for the replay
@@ -404,7 +444,7 @@ function captureBestGoal(){
 }
 
 function end(){
-  S.phase='end'; stopLoop();
+  S.phase='end'; stopLoop(); showControls(false);
   const g=S.goals, total=CFG.totalShots, saves=total-g;
   $('end-num').textContent=`${g} / ${total}`;
   let emoji,title,msg,col;
@@ -464,7 +504,7 @@ function hideFlash(){ flash.classList.add('hidden'); }
 // ─────────── INPUT (swipe to aim, flick to curve) ───────────
 function pt(e){ const r=canvas.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
 canvas.addEventListener('pointerdown', e=>{
-  if(S.state!=='aim') return;
+  if(S.state!=='aim' || S.paused || S.tutorialOpen) return;
   e.preventDefault();
   const p=pt(e); S.aiming=true; S.sx=p.x; S.sy=p.y; S.ax=p.x; S.ay=p.y;
   S.swipePts=[{x:p.x,y:p.y}];
@@ -559,12 +599,17 @@ function spawnPuff(x,y){
 function stopLoop(){ if(S.raf){cancelAnimationFrame(S.raf); S.raf=null;} }
 function loop(ts){
   const real=Math.min((ts-S.last)/1000,0.05); S.last=ts;
+  // pausable scheduled transition (post-result delay etc.)
+  if(S.pending && !S.paused){
+    S.pending.remain-=real;
+    if(S.pending.remain<=0){ const f=S.pending.fn; S.pending=null; f(); }
+  }
   // ease camera + slow-mo with real (unscaled) time
   S.zoom += (S.zoomTarget-S.zoom)*Math.min(1,real*6);
   S.timeScale += (S.timeScaleTarget-S.timeScale)*Math.min(1,real*6);
   const dt = real * S.timeScale;     // slow-mo scales gameplay time only
   update(dt); render();
-  S.raf=requestAnimationFrame(loop);
+  if(S.phase==='game' && !S.paused) S.raf=requestAnimationFrame(loop); else S.raf=null;
 }
 
 function update(dt){

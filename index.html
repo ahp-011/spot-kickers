@@ -55,6 +55,35 @@
         </span>
       </div>
 
+      <!-- top controls -->
+      <button id="ctrl-pause" class="ctrl-btn hidden" aria-label="Pause">⏸</button>
+      <button id="ctrl-help"  class="ctrl-btn hidden" aria-label="How to play">?</button>
+
+      <!-- pause overlay -->
+      <div id="pause" class="overlay hidden">
+        <div class="ov-card">
+          <h3 class="ov-title">PAUSED</h3>
+          <button id="btn-resume" class="btn">RESUME</button>
+          <button id="btn-howto" class="btn ghost">HOW TO PLAY</button>
+          <button id="btn-quit" class="btn ghost">QUIT TO MENU</button>
+        </div>
+      </div>
+
+      <!-- tutorial overlay -->
+      <div id="tutorial" class="overlay hidden">
+        <div class="ov-card">
+          <div class="tut-demo"><span class="tut-finger">👆</span></div>
+          <h3 class="ov-title">HOW TO SHOOT</h3>
+          <ul class="tut-list">
+            <li><b>Swipe up</b> toward the goal to shoot</li>
+            <li><b>Aim</b> by swiping left or right</li>
+            <li><b>Curve</b> the ball with an arced swipe 🌀</li>
+            <li><b>Flick further</b> for power — too far sails over!</li>
+          </ul>
+          <button id="btn-tut" class="btn">GOT IT!</button>
+        </div>
+      </div>
+
       <div id="scoreboard">
         <div class="sb-team">
           <span class="sb-flag" id="you-flag">🇫🇷</span>

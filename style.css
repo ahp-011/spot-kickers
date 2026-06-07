@@ -188,6 +188,42 @@ body{background:
   white-space:nowrap;pointer-events:none;transition:opacity .4s;z-index:12}
 #hint.hide{opacity:0}
 
+/* top control buttons (pause / help) */
+.ctrl-btn{
+  position:absolute;top:calc(var(--sat) + 12px);width:42px;height:42px;border-radius:50%;
+  border:3px solid var(--ink);background:linear-gradient(180deg,#fff,#eaf1fb);color:#16224e;
+  font-family:'Baloo 2',sans-serif;font-weight:800;font-size:1.1rem;line-height:1;
+  display:grid;place-items:center;cursor:pointer;z-index:24;
+  box-shadow:0 4px 0 rgba(5,16,46,.22);transition:transform .1s,box-shadow .1s}
+.ctrl-btn.hidden{display:none}
+.ctrl-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(5,16,46,.22)}
+#ctrl-pause{left:calc(var(--sal) + 12px)}
+#ctrl-help{left:calc(var(--sal) + 62px)}
+
+/* full-screen overlays (pause / tutorial) */
+.overlay{position:absolute;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;
+  background:rgba(6,13,34,.78);padding:20px}
+.overlay.hidden{display:none}
+.ov-card{width:min(88vw,360px);background:linear-gradient(180deg,#fff,#eef5ff);
+  border:3px solid var(--ink);border-radius:24px;padding:24px 22px;
+  display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;
+  box-shadow:0 14px 0 rgba(5,16,46,.25), 0 30px 60px rgba(0,0,0,.45)}
+.ov-title{font-family:'Luckiest Guy',cursive;font-size:1.9rem;color:#1f6fe0;letter-spacing:1px;
+  -webkit-text-stroke:2.5px var(--ink);paint-order:stroke fill;text-shadow:0 3px 0 rgba(5,16,46,.8)}
+.tut-list{list-style:none;display:flex;flex-direction:column;gap:9px;text-align:left;width:100%;
+  font-family:'Baloo 2',sans-serif;font-weight:600;font-size:.95rem;color:#23365f}
+.tut-list b{color:#16224e}
+.tut-demo{position:relative;width:100%;height:74px;display:grid;place-items:center;overflow:hidden}
+.tut-finger{font-size:2.6rem;filter:drop-shadow(0 3px 4px rgba(0,0,0,.3));
+  animation:tutSwipe 2.6s ease-in-out infinite}
+@keyframes tutSwipe{
+  0%{transform:translate(22px,26px) rotate(8deg);opacity:0}
+  14%{opacity:1}
+  55%{transform:translate(-8px,-20px) rotate(-4deg)}
+  90%{transform:translate(-34px,-40px) rotate(-10deg);opacity:1}
+  100%{transform:translate(-40px,-46px) rotate(-12deg);opacity:0}
+}
+
 /* achievement toast */
 #toast{
   position:absolute;left:50%;top:calc(var(--sat) + 14px);transform:translate(-50%,-160%);
