@@ -2,7 +2,7 @@
 
 A bright, juicy browser penalty game. Pick your World Cup 2026 nation, **swipe to aim and curve your shot**, and beat the keeper. Built with **plain HTML5 Canvas + vanilla JS** — no frameworks, no backend, no build step, no paid services. It deploys as static files anywhere for free.
 
-**[▶ Play it live](#)** · _(add your deploy URL here once it's live)_
+### **[▶ Play it live → spot-kickers.vercel.app](https://spot-kickers.vercel.app/)**
 
 ## How to play
 - Pick your nation on the menu, hit **START MATCH**.
