@@ -86,7 +86,24 @@
       <!-- tutorial overlay -->
       <div id="tutorial" class="overlay hidden">
         <div class="ov-card">
-          <div class="tut-demo"><span class="tut-finger">👆</span></div>
+          <div class="tut-demo">
+          <svg viewBox="0 0 220 150" class="tut-svg" aria-hidden="true">
+            <!-- mini goal -->
+            <rect x="58" y="12" width="104" height="26" rx="4" fill="none" stroke="#ffffff" stroke-width="4"/>
+            <!-- curved swipe path -->
+            <path d="M110 128 Q168 74 100 30" fill="none" stroke="#1f6fe0" stroke-width="5" stroke-dasharray="1.5 11" stroke-linecap="round"/>
+            <!-- arrowhead -->
+            <path d="M100 30 L118 36 M100 30 L106 48" fill="none" stroke="#1f6fe0" stroke-width="5" stroke-linecap="round"/>
+            <!-- ball -->
+            <circle cx="110" cy="128" r="11" fill="#fff" stroke="#1a1f33" stroke-width="3"/>
+            <circle cx="110" cy="128" r="3.4" fill="#1a1f33"/>
+            <!-- finger traces the swipe -->
+            <text font-size="30" text-anchor="middle" dominant-baseline="middle" opacity="0">👆
+              <animateMotion dur="2.6s" repeatCount="indefinite" path="M110 128 Q168 74 100 30" keyPoints="0;1;1" keyTimes="0;0.6;1" calcMode="linear"/>
+              <animate attributeName="opacity" dur="2.6s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.08;0.55;0.7;1"/>
+            </text>
+          </svg>
+        </div>
           <h3 class="ov-title">HOW TO SHOOT</h3>
           <ul class="tut-list">
             <li><b>Swipe up</b> toward the goal to shoot</li>

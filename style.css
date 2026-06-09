@@ -225,16 +225,8 @@ body{background:
 .tut-list{list-style:none;display:flex;flex-direction:column;gap:9px;text-align:left;width:100%;
   font-family:'Baloo 2',sans-serif;font-weight:600;font-size:.95rem;color:#23365f}
 .tut-list b{color:#16224e}
-.tut-demo{position:relative;width:100%;height:74px;display:grid;place-items:center;overflow:hidden}
-.tut-finger{font-size:2.6rem;filter:drop-shadow(0 3px 4px rgba(0,0,0,.3));
-  animation:tutSwipe 2.6s ease-in-out infinite}
-@keyframes tutSwipe{
-  0%{transform:translate(22px,26px) rotate(8deg);opacity:0}
-  14%{opacity:1}
-  55%{transform:translate(-8px,-20px) rotate(-4deg)}
-  90%{transform:translate(-34px,-40px) rotate(-10deg);opacity:1}
-  100%{transform:translate(-40px,-46px) rotate(-12deg);opacity:0}
-}
+.tut-demo{width:100%;max-width:240px;margin:0 auto}
+.tut-svg{width:100%;height:auto;display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,.2))}
 
 /* achievement toast */
 #toast{
