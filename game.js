@@ -270,7 +270,7 @@ function closeTutorial(){
   S.tutorialOpen=false; try{ localStorage.setItem('sk-tut','1'); }catch(e){}
   $('tutorial').classList.add('hidden');
   if(S._tutFromPause){ S._tutFromPause=false; $('pause').classList.remove('hidden'); }
-  else { hintEl.classList.remove('hide'); hintEl.textContent='Swipe to aim — flick to curve it!'; setTimeout(()=>hintEl.classList.add('hide'),2600); }
+  else { hintEl.classList.remove('hide'); hintEl.textContent='Drag the ball back & release to shoot!'; setTimeout(()=>hintEl.classList.add('hide'),2600); }
 }
 $('ctrl-pause').addEventListener('click', openPause);
 $('ctrl-help').addEventListener('click', ()=>{ if(!S.tutorialOpen && !S.paused) openTutorial(); });
@@ -321,7 +321,7 @@ function start(){
     if(!tutorialSeen()){
       openTutorial();                 // first-ever game: teach the swipe
     } else {
-      hintEl.classList.remove('hide'); hintEl.textContent='Swipe to aim — flick to curve it!';
+      hintEl.classList.remove('hide'); hintEl.textContent='Drag the ball back & release to shoot!';
       setTimeout(()=>hintEl.classList.add('hide'), 3000);
     }
   });
@@ -341,6 +341,7 @@ function newShot(){
   S.state='aim';
   S.anim=0; S.ballR=Math.max(12, canvas.width*0.022);
   S.bx=canvas.width/2; S.by=spotY();
+  S.launchX=canvas.width/2; S.launchY=spotY();
   S.kx=0; S.kTarget=0; S.kLunge=0;
   S.kPatrol=Math.random()*Math.PI*2; S.kBaseX=0; S.kDiveX=0;
   S.ripple=0; S.kickAnim=0;
@@ -354,7 +355,8 @@ function shoot(aim){
   if(S.state!=='aim') return;
   const g=goal(), W=canvas.width;
   S.tx=aim.tx; S.ty=aim.ty; S.curve=aim.curve; S.power=aim.power; S.over=aim.over; S.wide=aim.wide;
-  S.flightSpeed=CFG.ballSpeed*(0.85+aim.power*0.45);     // harder swipe = faster ball
+  S.launchX=S.bx; S.launchY=S.by;                        // ball slings from where it was pulled
+  S.flightSpeed=CFG.ballSpeed*(0.85+aim.power*0.45);     // harder pull = faster ball
   S.state='flying'; S.anim=0; S.kickAnim=0.0001; S.ballR0=S.ballR;
   hintEl.classList.add('hide');
   sfxKick();
@@ -467,7 +469,8 @@ function replayBest(){
   S._outcome='goal';
   S.tx=b.tx; S.ty=b.ty; S.curve=b.curve; S.power=b.power;
   S.flightSpeed=CFG.ballSpeed*(0.85+b.power*0.45);
-  S.bx=canvas.width/2; S.by=spotY(); S.ballR=Math.max(12,canvas.width*0.022); S.ballR0=S.ballR;
+  S.bx=canvas.width/2; S.by=spotY(); S.launchX=canvas.width/2; S.launchY=spotY();
+  S.ballR=Math.max(12,canvas.width*0.022); S.ballR0=S.ballR;
   S.kBaseX=b.kBaseX; S.kx=b.kBaseX; S.kLunge=0; S.keeperCele=0;
   const dir=Math.sign((b.tx-canvas.width/2)-b.kBaseX)||1;
   S.kDiveX=clamp(b.kBaseX-dir*maxDive*0.7,-maxDive,maxDive);
@@ -524,7 +527,7 @@ function endAim(e){
   S.aim=computeAim();
   if(dist<CFG.minSwipe || !S.aim.valid){
     // too small / not an up-swipe — show a nudge, don't shoot
-    hintEl.classList.remove('hide'); hintEl.textContent='Swipe up toward the goal — flick to curve!';
+    hintEl.classList.remove('hide'); hintEl.textContent='Drag the ball back, then release to shoot!';
     S.aim=null; return;
   }
   shoot(S.aim);
@@ -533,25 +536,34 @@ function endAim(e){
 canvas.addEventListener('pointerup', endAim);
 canvas.addEventListener('pointercancel', ()=>{ S.aiming=false; S.aim=null; });
 
-// turn the current swipe into an aim {tx,ty,power,curve,over,wide,valid}
+// SLINGSHOT: drag the ball BACK (downward), release to launch forward.
+// Aim is opposite to the pull; pull length = power. Returns {tx,ty,power,curve,over,wide,valid}
 function computeAim(){
   const g=goal(), W=canvas.width, H=canvas.height;
-  const vx=S.ax-S.sx, vy=S.ay-S.sy;
-  const power=clamp(-vy/(H*CFG.powerSpan), 0, 1.35);     // up-swipe length
-  const rawX=W/2 + vx*CFG.swipeSensX;
+  const vx=S.ax-S.sx, vy=S.ay-S.sy;        // drag vector; pulling back = downward (vy>0)
+  const power=clamp(vy/(H*CFG.powerSpan), 0, 1.35);   // how far you pulled back
+  const rawX=W/2 - vx*CFG.swipeSensX;        // inverted: pull left → shoot right
   let ty=lerp(g.y+g.h*0.86, g.y+g.h*0.08, clamp(power,0,1));
   let over=false, wide=false;
   if(power>CFG.overThresh){ over=true; ty=g.y - g.h*0.14; }
   if(rawX < g.x - g.w*0.04 || rawX > g.x+g.w+g.w*0.04) wide=true;
   const tx=clamp(rawX, g.x - g.w*0.12, g.x+g.w+g.w*0.12);
-  const curve=clamp(swipeBow(), -W*CFG.curveMax, W*CFG.curveMax) * CFG.curveScale;
-  return { tx, ty, power, curve, over, wide, valid: power>0.08 && vy<0 };
+  const curve=clamp(-swipeBow(), -W*CFG.curveMax, W*CFG.curveMax) * CFG.curveScale;
+  return { tx, ty, power, curve, over, wide, valid: power>0.08 && vy>0 };
 }
-// horizontal "bow" of the swipe path → curve amount
+// horizontal "bow" of the drag path → curve amount
 function swipeBow(){
   const p=S.swipePts; if(p.length<4) return 0;
   const a=p[0], b=p[p.length-1], m=p[Math.floor(p.length/2)];
   return m.x - (a.x+b.x)/2;
+}
+// where the pulled-back ball sits (clamped distance from the spot)
+function pulledPos(){
+  const W=canvas.width, H=canvas.height, sy=spotY();
+  let dx=S.ax-S.sx, dy=Math.max(0, S.ay-S.sy);    // only pull downward
+  const maxP=H*0.15, m=Math.hypot(dx,dy);
+  if(m>maxP){ dx*=maxP/m; dy*=maxP/m; }
+  return { x:W/2+dx, y:sy+dy };
 }
 
 // ─────────── GEOMETRY ───────────
@@ -621,13 +633,13 @@ function update(dt){
   if(S.state==='flying'){
     S.anim += dt*S.flightSpeed;
     if(S.anim>=1){ S.anim=1; resolve(); }
-    const W=canvas.width, R0=S.ballR0||canvas.width*0.022, sy=spotY();
+    const R0=S.ballR0||canvas.width*0.022, lx=S.launchX, ly=S.launchY;
     const curveOff = S.curve*Math.sin(Math.PI*Math.min(S.anim,1));   // bends mid-flight
     if(S._outcome==='save'){
       const tc=0.62;
       if(S.anim<=tc){
         const t=ease(S.anim/tc);
-        S.bx=lerp(W/2,S.saveX,t)+curveOff; S.by=lerp(sy,S.saveY,t);
+        S.bx=lerp(lx,S.saveX,t)+curveOff; S.by=lerp(ly,S.saveY,t);
         S.ballR=lerp(R0,R0*0.55,t);
       } else {
         const t=ease((S.anim-tc)/(1-tc));
@@ -636,9 +648,9 @@ function update(dt){
       }
       S.kLunge=Math.min(1, S.anim/tc);
     } else {
-      // GOAL or MISS: ball flies to its target (curving on the way)
+      // GOAL or MISS: ball slings to its target (curving on the way)
       const t=ease(S.anim);
-      S.bx=lerp(W/2,S.tx,t)+curveOff; S.by=lerp(sy,S.ty,t);
+      S.bx=lerp(lx,S.tx,t)+curveOff; S.by=lerp(ly,S.ty,t);
       S.ballR=lerp(R0, R0*(S._outcome==='miss'?0.38:0.5), t);
       S.kLunge=Math.min(1, S.anim*1.25);
     }
@@ -647,8 +659,8 @@ function update(dt){
     S.kLunge=Math.min(1, S.kLunge+dt*2);
     if(S._outcome==='save') S.keeperCele=Math.min(1, S.keeperCele+dt*1.8);  // keeper celebrates
   }
-  // live aim recompute (keeper may have moved since pointermove)
-  if(S.aiming) S.aim=computeAim();
+  // live aim recompute + pull the ball back toward the finger
+  if(S.aiming){ S.aim=computeAim(); const p=pulledPos(); S.bx=p.x; S.by=p.y; }
   // keeper x position
   const g=goal();
   if(S.state==='aim'){
@@ -678,9 +690,9 @@ function render(){
   drawField(W,H);
   drawGoal(W,H);
   drawKeeper(W,H);
-  drawBall();          // ball is in front of keeper, behind kicker
+  if(!S.aiming) drawBall();      // normal depth: behind the kicker
   drawKicker(W,H);
-  if(S.aiming && S.aim) drawAimPreview();
+  if(S.aiming && S.aim){ drawAimPreview(); drawBall(); }   // pulled-back ball + guide on top
   for(const p of S.particles){
     ctx.save(); ctx.globalAlpha=Math.max(0,Math.min(1,p.life)); ctx.fillStyle=p.c;
     if(p.shape==='rect'){ ctx.translate(p.x,p.y); ctx.rotate(p.rot||0); ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); }
@@ -696,11 +708,17 @@ function drawAimPreview(){
   const bad=a.over||a.wide;
   const col = bad ? 'rgba(232,65,58,.95)' : 'rgba(255,255,255,.95)';
   ctx.save();
-  ctx.strokeStyle=col; ctx.lineWidth=Math.max(2.5,W*0.007); ctx.lineCap='round';
+  ctx.lineCap='round';
+  // slingshot band: from the spot to the pulled-back ball
+  ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=Math.max(3,W*0.011);
+  ctx.beginPath(); ctx.moveTo(W/2,sy); ctx.lineTo(S.bx,S.by); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.6)'; ctx.beginPath(); ctx.arc(W/2,sy,W*0.012,0,7); ctx.fill();
+  // forward trajectory from the ball to the target
+  ctx.strokeStyle=col; ctx.lineWidth=Math.max(2.5,W*0.007);
   ctx.setLineDash([W*0.018, W*0.024]);
   ctx.beginPath();
   for(let i=0;i<=22;i++){ const t=i/22, e=ease(t);
-    const x=lerp(W/2,a.tx,e)+a.curve*Math.sin(Math.PI*t), y=lerp(sy,a.ty,e);
+    const x=lerp(S.bx,a.tx,e)+a.curve*Math.sin(Math.PI*t), y=lerp(S.by,a.ty,e);
     i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
   ctx.stroke(); ctx.setLineDash([]);
   // target crosshair

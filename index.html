@@ -87,29 +87,33 @@
       <div id="tutorial" class="overlay hidden">
         <div class="ov-card">
           <div class="tut-demo">
-          <svg viewBox="0 0 220 150" class="tut-svg" aria-hidden="true">
+          <svg viewBox="0 0 220 170" class="tut-svg" aria-hidden="true">
             <!-- mini goal -->
-            <rect x="58" y="12" width="104" height="26" rx="4" fill="none" stroke="#ffffff" stroke-width="4"/>
-            <!-- curved swipe path -->
-            <path d="M110 128 Q168 74 100 30" fill="none" stroke="#1f6fe0" stroke-width="5" stroke-dasharray="1.5 11" stroke-linecap="round"/>
-            <!-- arrowhead -->
-            <path d="M100 30 L118 36 M100 30 L106 48" fill="none" stroke="#1f6fe0" stroke-width="5" stroke-linecap="round"/>
-            <!-- ball -->
-            <circle cx="110" cy="128" r="11" fill="#fff" stroke="#1a1f33" stroke-width="3"/>
-            <circle cx="110" cy="128" r="3.4" fill="#1a1f33"/>
-            <!-- finger traces the swipe -->
-            <text font-size="30" text-anchor="middle" dominant-baseline="middle" opacity="0">👆
-              <animateMotion dur="2.6s" repeatCount="indefinite" path="M110 128 Q168 74 100 30" keyPoints="0;1;1" keyTimes="0;0.6;1" calcMode="linear"/>
-              <animate attributeName="opacity" dur="2.6s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.08;0.55;0.7;1"/>
+            <rect x="58" y="10" width="104" height="24" rx="4" fill="none" stroke="#ffffff" stroke-width="4"/>
+            <!-- shot path: ball flies up into the goal -->
+            <path d="M110 92 Q150 60 105 30" fill="none" stroke="#1f6fe0" stroke-width="5" stroke-dasharray="1.5 11" stroke-linecap="round"/>
+            <path d="M105 30 L122 36 M105 30 L110 48" fill="none" stroke="#1f6fe0" stroke-width="5" stroke-linecap="round"/>
+            <!-- stretchy pull band -->
+            <line x1="110" y1="92" x2="110" y2="92" stroke="#e23b3b" stroke-width="4" stroke-linecap="round">
+              <animate attributeName="y2" dur="2.6s" repeatCount="indefinite" values="92;152;152;92;92" keyTimes="0;0.4;0.5;0.56;1"/>
+              <animate attributeName="opacity" dur="2.6s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.08;0.5;0.56;1"/>
+            </line>
+            <!-- ball at the spot -->
+            <circle cx="110" cy="92" r="11" fill="#fff" stroke="#1a1f33" stroke-width="3"/>
+            <circle cx="110" cy="92" r="3.4" fill="#1a1f33"/>
+            <!-- finger pulls back, then releases -->
+            <text x="110" y="100" font-size="28" text-anchor="middle" dominant-baseline="middle">👇
+              <animate attributeName="y" dur="2.6s" repeatCount="indefinite" values="100;160;160;100;100" keyTimes="0;0.4;0.5;0.56;1"/>
+              <animate attributeName="opacity" dur="2.6s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.08;0.5;0.56;1"/>
             </text>
           </svg>
         </div>
           <h3 class="ov-title">HOW TO SHOOT</h3>
           <ul class="tut-list">
-            <li><b>Swipe up</b> toward the goal to shoot</li>
-            <li><b>Aim</b> by swiping left or right</li>
-            <li><b>Curve</b> the ball with an arced swipe 🌀</li>
-            <li><b>Flick further</b> for power — too far sails over!</li>
+            <li><b>Drag the ball back</b>, then release to shoot</li>
+            <li>The <b>dotted line</b> shows where it'll go — aim with it</li>
+            <li><b>Pull harder</b> for more power (too far sails over!)</li>
+            <li><b>Angle your pull</b> to bend the shot 🌀</li>
           </ul>
           <button id="btn-tut" class="btn">GOT IT!</button>
         </div>
