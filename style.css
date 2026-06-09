@@ -51,11 +51,8 @@ body{background:
 @keyframes splashBall{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-16px) rotate(180deg)}}
 .splash-sub{font-family:'Russo One',sans-serif;letter-spacing:4px;font-size:clamp(.8rem,3.6vw,1.1rem);
   color:#fff;-webkit-text-stroke:1.5px var(--ink);paint-order:stroke fill;text-shadow:0 2px 0 rgba(5,16,46,.5)}
-.splash-bar{width:min(60vw,220px);height:10px;border-radius:99px;margin-top:6px;
-  background:rgba(255,255,255,.45);border:2.5px solid var(--ink);overflow:hidden}
-.splash-bar span{display:block;height:100%;width:0;border-radius:99px;
-  background:linear-gradient(90deg,#1f6fe0,#e23b3b);animation:splashLoad 2.3s ease-out forwards}
-@keyframes splashLoad{0%{width:0}100%{width:100%}}
+/* centre the two title words on the splash */
+#screen-splash .title{align-items:center;text-align:center}
 
 /* ── helpers: chunky outlined display type ── */
 .display{
