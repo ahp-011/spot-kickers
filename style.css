@@ -30,8 +30,8 @@ body{background:
 #app{position:relative;width:100%;
   height:100vh; height:100svh; height:100dvh;  /* dynamic viewport: handles mobile URL bar */
   display:flex;align-items:center;justify-content:center}
-/* game screen is full-bleed; menu/end center their card on a daytime stadium */
-#screen-menu,#screen-end{
+/* game screen is full-bleed; splash/menu/end sit on a daytime stadium */
+#screen-splash,#screen-menu,#screen-end{
   padding:calc(var(--sat) + 10px) calc(var(--sar) + 10px) calc(var(--sab) + 10px) calc(var(--sal) + 10px);
   background:
     /* colourful stand billboard strip */
@@ -41,6 +41,21 @@ body{background:
     /* sky → grass */
     linear-gradient(180deg, #bfe9ff 0%, #9bd9f5 22%, #6fcb53 27%, #56bd40 100%);
 }
+
+/* ── splash screen ── */
+.splash-inner{display:flex;flex-direction:column;align-items:center;gap:16px;
+  animation:splashIn .6s cubic-bezier(.18,.89,.32,1.45) both}
+@keyframes splashIn{0%{transform:scale(.55);opacity:0}100%{transform:scale(1);opacity:1}}
+.splash-ball{font-size:clamp(3rem,15vw,5.2rem);line-height:1;
+  filter:drop-shadow(0 6px 8px rgba(0,0,0,.35));animation:splashBall 1.5s ease-in-out infinite}
+@keyframes splashBall{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-16px) rotate(180deg)}}
+.splash-sub{font-family:'Russo One',sans-serif;letter-spacing:4px;font-size:clamp(.8rem,3.6vw,1.1rem);
+  color:#fff;-webkit-text-stroke:1.5px var(--ink);paint-order:stroke fill;text-shadow:0 2px 0 rgba(5,16,46,.5)}
+.splash-bar{width:min(60vw,220px);height:10px;border-radius:99px;margin-top:6px;
+  background:rgba(255,255,255,.45);border:2.5px solid var(--ink);overflow:hidden}
+.splash-bar span{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,#1f6fe0,#e23b3b);animation:splashLoad 2.3s ease-out forwards}
+@keyframes splashLoad{0%{width:0}100%{width:100%}}
 
 /* ── helpers: chunky outlined display type ── */
 .display{

@@ -205,7 +205,7 @@ const S = {
 
 // ─────────── DOM ───────────
 const $ = id => document.getElementById(id);
-const screens = { menu:$('screen-menu'), game:$('screen-game'), end:$('screen-end') };
+const screens = { splash:$('screen-splash'), menu:$('screen-menu'), game:$('screen-game'), end:$('screen-end') };
 const canvas = $('canvas'); const ctx = canvas.getContext('2d');
 const hintEl = $('hint'); const flash = $('flash'); const flashText = $('flash-text');
 
@@ -984,5 +984,8 @@ function contrast(hex){
   return (0.299*r+0.587*g+0.114*b)>150 ? '#1a1a1a' : '#f4f6fb';
 }
 
-// init
-show('menu');
+// ─────────── INIT (splash → menu) ───────────
+function dismissSplash(){ if(screens.splash.classList.contains('active')) show('menu'); }
+screens.splash.addEventListener('click', dismissSplash);
+show('splash');
+setTimeout(dismissSplash, 2600);   // auto-advance after the splash
