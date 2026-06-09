@@ -8,12 +8,15 @@ const CFG = {
   totalShots:   5,
   ballSpeed:    1.7,    // higher = faster ball flight
   shakeMag:     10,     // screen shake on goal
-  // Patrolling keeper — slides left/right; save depends on its position
-  keeperPatrolRange: 0.20,  // how far the keeper roams (fraction of goal width, each side)
-  keeperPatrolSpeed: 1.1,   // patrol sweep speed (lower = slower / easier)
-  keeperReach:       0.26,  // how wide an area the keeper can dive-save (fraction of goal width)
-  keeperTopBonus:    0.82,  // reach multiplier for high shots (<1 = top corners are harder to save)
-  keeperWrongGuess:  0.0,   // chance keeper fumbles a reachable ball (0 = glove always matches outcome)
+  // Patrolling keeper — slides left/right; save depends on its position (tough but fair)
+  keeperPatrolRange: 0.22,  // how far the keeper roams (fraction of goal width, each side)
+  keeperPatrolSpeed: 1.5,   // patrol sweep speed (faster = harder to time)
+  keeperReach:       0.36,  // "comfort" reach — anything this close is a certain save
+  keeperStretch:     0.28,  // extra diving range beyond reach where saves get likely
+  keeperDiveSave:    0.95,  // max save chance at the edge of reach (fades to 0 at reach+stretch)
+  keeperTopBonus:    0.86,  // reach multiplier for high shots (<1 = top corners a touch easier to beat)
+  powerReachPenalty: 0.16,  // a hard shot gives the keeper less time (shrinks reach)
+  curveBeat:         0.14,  // a curved shot can wrong-foot the keeper (shrinks reach)
   goalDiveShort:     0.35,  // on a GOAL, keeper dives only this fraction of its reach (clear visible gap)
   // Swipe-to-aim controls
   swipeSensX:   1.5,    // horizontal aim sensitivity (drag px → goal px)
@@ -368,8 +371,16 @@ function shoot(aim){
     // save depends on the keeper's CURRENT (patrol) position vs. where the ball goes
     const ballOff=S.tx-W/2, keeperOff=S.kBaseX;
     let reach=CFG.keeperReach*g.w;
-    if(S.ty < g.y+g.h*0.42) reach*=CFG.keeperTopBonus;
-    const saved=(Math.abs(ballOff-keeperOff)<=reach) && (Math.random()>=CFG.keeperWrongGuess);
+    if(S.ty < g.y+g.h*0.42) reach*=CFG.keeperTopBonus;                 // high shots a touch easier
+    reach*=(1 - clamp(S.power-0.4,0,1)*CFG.powerReachPenalty);         // hard shots give less time
+    reach*=(1 - clamp(Math.abs(S.curve)/(g.w*0.16),0,1)*CFG.curveBeat);// curve can wrong-foot keeper
+    const d=Math.abs(ballOff-keeperOff);
+    let saved;
+    if(d<=reach){ saved=true; }                                        // within comfort reach: certain save
+    else {                                                             // diving stretch: likely near the edge, safe deep in the corner
+      const p=clamp(1-(d-reach)/(CFG.keeperStretch*g.w),0,1)*CFG.keeperDiveSave;
+      saved=Math.random()<p;
+    }
     const maxDive=g.w*0.42, dir=Math.sign(ballOff-keeperOff)||1;
     if(saved){
       S._outcome='save';
