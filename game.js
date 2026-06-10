@@ -302,6 +302,7 @@ if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{ if(S.
 // ─────────── GAME FLOW ───────────
 function start(){
   audio(); // unlock audio on user gesture
+  track('match_started', { team: S.team.abbr });   // someone actually played
   S.phase='game'; S.shot=0; S.goals=0; S.results=[]; S.particles=[];
   S.bestGoal=null; S.replay=false; S.streak=0;
   S.paused=false; S.tutorialOpen=false; S.pending=null; S._tutFromPause=false;
@@ -468,6 +469,7 @@ function end(){
   $('end-emoji').textContent=emoji; $('end-title').textContent=title; $('end-msg').textContent=msg;
   document.getElementById('end-title').style.color = col;
   $('btn-replay').classList.toggle('hidden', !S.bestGoal);
+  track('match_completed', { goals:g, result:(g>saves?'win':g<saves?'lose':'draw') });
   show('end');
 }
 
@@ -1008,6 +1010,8 @@ const lerp=(a,b,t)=>a+(b-a)*t;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const ease=t=>1-Math.pow(1-t,3);
 function vibrate(pattern){ try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){} }
+// analytics: send a custom event to Vercel Web Analytics (no-op if not available)
+function track(name, data){ try{ if(window.va) window.va('event', data?{name,data}:{name}); }catch(e){} }
 function contrast(hex){
   const c=hex.replace('#',''); const r=parseInt(c.substr(0,2),16),g=parseInt(c.substr(2,2),16),b=parseInt(c.substr(4,2),16);
   return (0.299*r+0.587*g+0.114*b)>150 ? '#1a1a1a' : '#f4f6fb';
